@@ -113,7 +113,7 @@ void my_wait(pid_t pid){
 			printk("[program2] : The return signal is %d\n", signal);
 		}
 	} else if (stop) {
-		int signum = 19;
+		int signum = 19+stopsig;
 		//printk("[program2] : stop = %d, stopsig = %d", stop, stopsig);
 		if (signum >= 0 && signum < sizeof(signal_names) / sizeof(signal_names[0])) {
 			printk("[program2] : get %s signal.\n", signal_names[signum - 1]);
@@ -140,7 +140,7 @@ int my_exec(void){
 	const char *const argv[] = {path, NULL, NULL};
 	const char *const envp[] = {"HOME=/", "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL }; */
 	//char path[] = "/home/vagrant/csc3150/CSC3150/hw1/source/program2/test";
-	char path[] = "/home/vagrant/csc3150/CSC3150/hw1/source/program1/bus";
+	char path[] = "/home/vagrant/csc3150/CSC3150/hw1/source/program1/stop";
 	char *argv[] = {path, NULL, NULL};
 	char *envp[] = {"HOME=/", "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
 

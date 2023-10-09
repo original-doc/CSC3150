@@ -53,6 +53,7 @@ extern int do_execve( struct filename *filename,
 extern struct filename *getname_kernel(const char *filename);
 extern long do_wait(struct wait_opts *wo);
 
+
 void my_wait(pid_t pid){
 	int status;
 	struct wait_opts wo;
@@ -77,6 +78,7 @@ void my_wait(pid_t pid){
 		printk("do_wait is error with signal %d", signal);
 	}
 	//printk("do_wait return value is %d\n", &signal);
+	//printk("do_wait return value is %d\n", signal);
 
     //printk("[Do_Fork] : The return signal is %d\n", wo.wo_stat);
 
@@ -140,7 +142,7 @@ int my_exec(void){
 	const char *const argv[] = {path, NULL, NULL};
 	const char *const envp[] = {"HOME=/", "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL }; */
 	//char path[] = "/home/vagrant/csc3150/CSC3150/hw1/source/program2/test";
-	char path[] = "/home/vagrant/csc3150/CSC3150/hw1/source/program1/stop";
+	char path[] = "/tmp/test";
 	char *argv[] = {path, NULL, NULL};
 	char *envp[] = {"HOME=/", "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
 
@@ -166,7 +168,7 @@ int my_exec(void){
 		return 0;
 	}
 
-	//do_exit(result);
+	do_exit(result);
 }
 
 //implement fork function

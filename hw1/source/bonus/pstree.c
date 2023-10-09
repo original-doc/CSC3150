@@ -57,6 +57,7 @@ void find_proc()
 
 			node = (struct Process *)malloc(sizeof(struct Process));
 			node->pid = unused1;
+			//printf("%d\n.", node->pid);
 			node->pgid = pgid;
 			node->name =find_name(name_old, 1, strlen(name_old) - 2);
 			node->ppid = ppid;
@@ -87,13 +88,14 @@ void link_node()
 	struct Process *pnode, *node;
 	int i;
 	for (node = node_head; node != NULL; node = node->next) {
-		// printf("%d\n",node->pid);
 		i = 0;
 		pnode = find_parent(node->ppid);
+		// printf("%d\n",node->pid);
 
 		if (pnode != NULL) {
 			node->parent = pnode;
 			while (pnode->child[i++] != NULL);
+			//printf(i);
 			pnode->child[i - 1] = node;
 			pnode->child[i] = NULL;
 		}
@@ -136,8 +138,8 @@ char *find_name(char *str, int start, int end)
 
 
 
-int arr[300];
-int arr_count = 0;
+int array[300];
+int count_array = 0;
 
 int length(int data)
 {
@@ -161,8 +163,8 @@ void print_tree(struct Process *root, int level)
 			// not the first child
 
 			for (i = 0; i < level; i++) {
-				for (k = 0; k < arr_count; k++) {
-					if (arr[k] == i) {
+				for (k = 0; k < count_array; k++) {
+					if (array[k] == i) {
 						printf("│");
 					}
 				}
@@ -176,7 +178,7 @@ void print_tree(struct Process *root, int level)
 		} else {
 			if (root->parent->child[1] != NULL) { 
 				// not only one child
-				arr[arr_count++] = level;
+				array[count_array++] = level;
 				printf("┬");
 				count = count + 2;
 			} else {
@@ -195,6 +197,52 @@ void print_tree(struct Process *root, int level)
 	}
 }
 
+void print_tree_A(struct Process *root, int level)
+{
+	int i;
+	int k;
+	struct Process *node;
+	int count = 0;
+
+	if (root->parent != NULL) {
+		if (root->parent->child[0] != root) { 
+			// not the first child
+
+			for (i = 0; i < level; i++) {
+				for (k = 0; k < count_array; k++) {
+					if (array[k] == i) {
+						printf("|");
+					}
+				}
+
+				printf(" ");
+			}
+
+			printf("|-");
+
+			count = count + 1;
+		} else {
+			if (root->parent->child[1] != NULL) { 
+				// not only one child
+				array[count_array++] = level;
+				printf("+");
+				count = count + 2;
+			} else {
+				printf("-");
+				count = count + 1;
+			}
+		}
+	}
+	printf("%s", root->name);
+	if (root->child[0] == NULL){printf("\n");}
+
+	//recursion on children
+	int j = 0;
+	while ((node = root->child[j++]) != NULL) {
+		print_tree_A(node, level + strlen(root->name) + count);
+	}
+}
+
 void print_tree_p(struct Process *root, int level)
 {
 	int i;
@@ -205,8 +253,8 @@ void print_tree_p(struct Process *root, int level)
 		if (root->parent->child[0] != root) { // not the first child
 
 			for (i = 0; i < level; i++) {
-				for (k = 0; k < arr_count; k++) {
-					if (arr[k] == i) {
+				for (k = 0; k < count_array; k++) {
+					if (array[k] == i) {
 						printf("│");
 					}
 				}
@@ -220,7 +268,7 @@ void print_tree_p(struct Process *root, int level)
 		} else {
 			if (root->parent->child[1] != NULL) { 
 				// not only one child
-				arr[arr_count++] = level;
+				array[count_array++] = level;
 				printf("┬");
 				count = count + 2;
 			} else {
@@ -253,8 +301,8 @@ void print_tree_g(struct Process *root, int level)
 			// not the first child
 
 			for (i = 0; i < level; i++) {
-				for (k = 0; k < arr_count; k++) {
-					if (arr[k] == i) {
+				for (k = 0; k < count_array; k++) {
+					if (array[k] == i) {
 						printf("│");
 					}
 				}
@@ -268,7 +316,7 @@ void print_tree_g(struct Process *root, int level)
 		} else {
 			if (root->parent->child[1] != NULL) { 
 				// not only one child
-				arr[arr_count++] = level;
+				array[count_array++] = level;
 				printf("┬");
 				count = count + 2;
 			} else {
@@ -301,7 +349,6 @@ int main(int argc, char *argv[])
 	if (argc == 1) {
 		print_tree(node_root, 0);
 	}
-
 	else if (argc == 2) {
 		if (!strcmp(argv[1], "-V")) {
 			version();
@@ -312,17 +359,17 @@ int main(int argc, char *argv[])
 		} else if (!strcmp(argv[1], "-c")) {
 			print_tree(node_root, 0);
 		} else if (!strcmp(argv[1], "-A")) {
-			print_tree(node_root, 0);
+			print_tree_A(node_root, 0);
 		}
 		else {
-			printf("wrong option\nplease enter -V or -p or -g or -c or -A\n");
+			printf("Please enter -V or -p or -g or -c or -A\n");
+			printf("Sorry, but other options are not supported due to limit of effort.");
 			return -1;
 		}
-
 	}
-
 	else {
 		printf("wrong input format\n");
+		printf("Please enter ./pstree -V or -p or -g or -c or -A\n");
 	}
 
 	return 0;

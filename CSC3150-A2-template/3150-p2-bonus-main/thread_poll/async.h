@@ -8,6 +8,8 @@ typedef struct my_item {
   /* TODO: More stuff here, maybe? */
   struct my_item *next;
   struct my_item *prev;
+  void (*handler_func)(int);
+  int args;
 } my_item_t;
 
 typedef struct my_queue {

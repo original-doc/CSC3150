@@ -242,126 +242,6 @@ bad:
   return -1;
 }
 
-// TODO: complete mmap()
-uint64
-sys_mmap(void)
-{
-  // initailize the variables for vma, basing on the structure of vma in proc.h
-  uint64 addr;
-  int length;
-  int prot;
-  int flags;
-  int fd;
-  int offset;
-
-  struct file *file;
-  struct proc *p = myproc();// get the current process
-
-  // get the arguments from the user stack
-  argaddr(0, &addr);
-  argint(1, &length);
-  argint(2, &prot);
-  argint(3, &flags);
-  if (argfd(4, &fd, &file) < 0){
-    return -1;
-  }
-  argint(5, &offset);
-
-  // if the file is opened read-only, it cannot be mapped with shared writable permission
-  if (!file->writable && (prot & PROT_WRITE) && (flags & MAP_SHARED)){
-    // this is to prevent the test case of mapping a file opened read-only with shared writable mapping, which should fail
-    return -1;
-  }
-
-  length = PGROUNDUP(length); // round up the length to the page size
-  // check the address space limit
-  if (p->sz > MAXVA - length){
-    // this is to prevent the test case of mapping a file that exceeds the maximum virtual address
-    return -1;
-  }
-
-  // find a free vma slot
-  for (int i = 0; i < VMASIZE; i++){
-    if (p->vma[i].used == 0){
-      // allocate and fill in the vma information
-      p->vma[i].used = 1;
-      p->vma[i].addr = p->sz;// choose the free virtual address
-      p->vma[i].length = length;
-      p->vma[i].prot = prot;
-      p->vma[i].flags = flags;
-      p->vma[i].fd = fd;
-      p->vma[i].file = file;
-      p->vma[i].offset = offset;
-      // increase the reference count of the file
-      filedup(file);
-      // increase the virtual address space size
-      p->sz += length;
-      // return the start address of the mapped region
-      return p->vma[i].addr;
-    }
-  }
-  // failed when there's no free vma slot
-  panic("syscall mmap");
-  return -1;
-  //return 0;
-}
-
-// TODO: complete munmap()
-uint64
-sys_munmap(void)
-{
-  // initailize the necessary variables for munmap
-  uint64 addr;
-  int length;
-  struct proc *p = myproc(); // get the current process
-  //set as 0 first is used to detect wthether the vma is found
-  struct vma *vma = 0;
-
-  argaddr(0, &addr);
-  argint(1, &length);
-
-  // round down the address and round up the length to the page size
-  addr = PGROUNDDOWN(addr);
-  length = PGROUNDUP(length);
-
-  // find the corresponding vma
-  for (int i = 0; i < VMASIZE; i++){
-    if (addr >= p->vma[i].addr && addr < p->vma[i].addr + p->vma[i].length){
-      vma = &p->vma[i];
-      break;
-
-    }
-  }
-
-  if (vma == 0){
-    // fail when there's no matching vma
-    return -1;
-  }
-
-  if (vma->addr == addr){
-    // update the vma information by length for the next time this vma is used if the vma is not totally unmapped
-    vma->addr += length;
-    vma->length -= length;
-
-    // if the vma is mapped with shared writable permission, write back the modified pages to the file
-    // this is to handle the test case of writing to the mapped memory and checking that the modifications are written back to the file
-    if (vma->flags & MAP_SHARED){
-      filewrite(vma->file, addr, length);
-    }
-
-    // unmap and free the pages from the page table by the number of pages = length/PGSIZE
-    uvmunmap(p->pagetable, addr, length / PGSIZE, 1);
-    // if the vma is completely unmapped, free the vma and close the file
-    if (vma->length == 0){
-      fileclose(vma->file);
-      vma->used = 0;
-    }
-  }
-
-  return 0;
-}
-
-
 static struct inode*
 create(char *path, short type, short major, short minor)
 {
@@ -421,6 +301,8 @@ create(char *path, short type, short major, short minor)
   return 0;
 }
 
+// (BONUS) TODO: Check line:339
+// symlink, recursive follow the symlink
 uint64
 sys_open(void)
 {
@@ -452,6 +334,40 @@ sys_open(void)
       iunlockput(ip);
       end_op();
       return -1;
+    }
+  }
+  // (BONUS) TODO:
+  if (ip->type == T_SYMLINK && (omode & O_NOFOLLOW) == 0) {
+    int cnt = 0;
+    // loop while the inode is of type symbolic link
+    while(ip->type == T_SYMLINK){
+
+      if(++cnt > 10){// check whether the symlink traversal depth exceeds the allowed limit
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+      int len = 0;//store the length of the target path
+      if(readi(ip, 0, (uint64)&len, 0, sizeof(len)) != sizeof(len)){ // read the length of the target path from the symbolic link inode
+        // if failed, release the inode and end the file system operation
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+      if(readi(ip, 0, (uint64)path, sizeof(len), len + 1) != len + 1){ // read the target path from the symbolic link inode
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+
+      iunlockput(ip);// release the symbolic link inode
+      if((ip = namei(path)) == 0){ // Look up the target path and obtain the corresponding inode
+        //if failed end file system operation
+        end_op();
+        return -1;
+      }
+
+      ilock(ip); // lock the inode for following operations
     }
   }
 
@@ -622,4 +538,39 @@ sys_pipe(void)
     return -1;
   }
   return 0;
+}
+
+// (BONUS)TODO
+uint64
+sys_symlink(void) {
+  // Template return for compile
+  char target[MAXPATH], path[MAXPATH];
+    if (argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0){
+      return -1;
+    }
+
+    begin_op();
+    // create a symbolic link inode with the specified path
+    struct inode* inode = create(path, T_SYMLINK, 0, 0);
+    if (inode == 0){ // if inode creation fails, end the file system operation and return an error
+      end_op();
+      return -1;
+    }
+    int len = strlen(target);
+    // write the length of the target string to the inode
+    if (writei(inode, 0, (uint64)&len, 0, sizeof(len)) < 0){// if writing the length fails, release the inode, end the file system operation, and return error
+      iunlockput(inode);
+      end_op();
+      return -1;
+    }
+    // write the target string to the inode, starting after the length area
+    if (writei(inode, 0, (uint64)target, sizeof(len), len + 1) < 0){// if failed
+      iunlockput(inode);
+      end_op();
+      return -1;
+    }
+    // release the inode, and end the file system operation
+    iunlockput(inode);
+    end_op();
+    return 0;
 }
